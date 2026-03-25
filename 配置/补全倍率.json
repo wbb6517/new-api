@@ -1,0 +1,21 @@
+{
+  "gpt-5.1": 8,
+  "gpt-5.1-codex": 8,
+  "gpt-5.1-codex-mini": 8,
+  "gpt-5.1-codex-max": 8,
+  "gpt-5.2": 8,
+  "gpt-5.2-codex": 8,
+  "gpt-5.3-codex": 8,
+  "gpt-5.3-codex-spark": 8,
+  "gpt-5.4": 6,
+  "gpt-5.4-mini": 6,
+  "gpt-5-codex": 8,
+  "gpt-5-codex-mini": 8,
+  "gemini-2.5-flash": 8.33,
+  "gemini-2.5-flash-lite": 4,
+  "gemini-2.5-pro": 8,
+  "gemini-3-flash-preview": 6,
+  "gemini-3-pro-preview": 6,
+  "gemini-3.1-flash-lite-preview": 6,
+  "gemini-3.1-pro-preview": 6
+}
