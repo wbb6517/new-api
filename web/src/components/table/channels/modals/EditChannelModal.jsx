@@ -2414,9 +2414,15 @@ const EditChannelModal = (props) => {
                     }
                     template={STATUS_CODE_MAPPING_EXAMPLE}
                     templateLabel={t('填入模板')}
-                    editorType='keyValue'
+                    editorType='statusCode'
                     formApi={formApiRef.current}
-                    extraText={t('键为原状态码；值可以是目标状态码，或 `{ status_code, message }` 对象。若仅设置 message，则只改写返回消息。')}
+                    extraText={
+                      <div className='whitespace-normal break-all'>
+                        {t(
+                          '键为原状态码；值可以是目标状态码，或 `{ status_code, message }` 对象。若仅设置 message，则只改写返回消息。',
+                        )}
+                      </div>
+                    }
                   />
                 </div>
 

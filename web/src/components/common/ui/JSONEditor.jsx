@@ -612,9 +612,182 @@ const JSONEditor = ({
     );
   };
 
+  // 渲染状态码复写编辑器
+  const renderStatusCodeEditor = () => {
+    return (
+      <div className='space-y-1'>
+        {/* 重复键警告 */}
+        {duplicateKeys.size > 0 && (
+          <Banner
+            type='warning'
+            icon={<IconAlertTriangle />}
+            description={
+              <div>
+                <Text strong>{t('存在重复的源状态码：')}</Text>
+                <Text>{Array.from(duplicateKeys).join(', ')}</Text>
+                <br />
+                <Text type='tertiary' size='small'>
+                  {t('注意：JSON中重复的键只会保留最后一个同名键的值')}
+                </Text>
+              </div>
+            }
+            className='mb-3'
+          />
+        )}
+
+        {keyValuePairs.length === 0 && (
+          <div className='text-center py-6 px-4'>
+            <Text type='tertiary' className='text-gray-500 text-sm'>
+              {t('暂无数据，点击下方按钮添加复写规则')}
+            </Text>
+          </div>
+        )}
+
+        <div className='hidden sm:block mb-2'>
+          <Row gutter={8}>
+            <Col span={6}>
+              <Text strong size='small' type='secondary'>
+                {t('原状态码')}
+              </Text>
+            </Col>
+            <Col span={6}>
+              <Text strong size='small' type='secondary'>
+                {t('目标状态码')}
+              </Text>
+            </Col>
+            <Col span={10}>
+              <Text strong size='small' type='secondary'>
+                {t('自定义消息')}
+              </Text>
+            </Col>
+          </Row>
+        </div>
+
+        {keyValuePairs.map((pair, index) => {
+          const isDuplicate = duplicateKeys.has(pair.key);
+          const isObject = typeof pair.value === 'object' && pair.value !== null;
+          const targetCode = isObject ? pair.value.status_code : pair.value;
+          const message = isObject ? pair.value.message : '';
+
+          const updateStatusCodePair = (field, newVal) => {
+            const currentVal = pair.value;
+            let finalVal;
+
+            if (field === 'key') {
+              updateKey(pair.id, newVal);
+              return;
+            }
+
+            // 保持对象结构或转换为对象结构
+            const updatedObj =
+              typeof currentVal === 'object' && currentVal !== null
+                ? { ...currentVal }
+                : { status_code: currentVal };
+
+            if (field === 'targetCode') {
+              // 如果没有消息且目标码是原始值，可以存为简单值以保持简洁
+              if (!updatedObj.message && !newVal) {
+                finalVal = '';
+              } else if (!updatedObj.message && newVal) {
+                finalVal = newVal;
+              } else {
+                updatedObj.status_code = newVal;
+                finalVal = updatedObj;
+              }
+            } else if (field === 'message') {
+              if (!newVal && !updatedObj.status_code) {
+                finalVal = '';
+              } else if (!newVal && updatedObj.status_code) {
+                finalVal = updatedObj.status_code;
+              } else {
+                updatedObj.message = newVal;
+                // 确保有状态码字段，即使是空的
+                if (updatedObj.status_code === undefined) {
+                  updatedObj.status_code = '';
+                }
+                finalVal = updatedObj;
+              }
+            }
+
+            updateValue(pair.id, finalVal);
+          };
+
+          return (
+            <div key={pair.id} className='p-2 border border-gray-100 rounded-lg mb-2 bg-gray-50/30'>
+              <Row gutter={8} align='middle'>
+                <Col span={24} className='sm:hidden mb-2'>
+                  <div className='flex justify-between items-center'>
+                    <Text strong size='small'>
+                      {t('规则')} #{index + 1}
+                    </Text>
+                    <Button
+                      icon={<IconDelete />}
+                      type='danger'
+                      theme='borderless'
+                      size='small'
+                      onClick={() => removeKeyValue(pair.id)}
+                    />
+                  </div>
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Input
+                    placeholder='429'
+                    value={pair.key}
+                    onChange={(val) => updateStatusCodePair('key', val)}
+                    status={isDuplicate ? 'warning' : undefined}
+                    className='!bg-white'
+                  />
+                </Col>
+                <Col xs={12} sm={6}>
+                  <Input
+                    placeholder='503'
+                    value={String(targetCode || '')}
+                    onChange={(val) => updateStatusCodePair('targetCode', val)}
+                    className='!bg-white'
+                  />
+                </Col>
+                <Col xs={20} sm={10} className='mt-2 sm:mt-0'>
+                  <TextArea
+                    placeholder={t('自定义返回给用户的错误消息 (可选)')}
+                    value={message}
+                    autosize
+                    rows={1}
+                    onChange={(val) => updateStatusCodePair('message', val)}
+                    className='!bg-white'
+                  />
+                </Col>
+                <Col xs={4} sm={2} className='hidden sm:flex justify-center'>
+                  <Button
+                    icon={<IconDelete />}
+                    type='danger'
+                    theme='borderless'
+                    onClick={() => removeKeyValue(pair.id)}
+                  />
+                </Col>
+              </Row>
+            </div>
+          );
+        })}
+
+        <div className='mt-2 flex justify-center'>
+          <Button
+            icon={<IconPlus />}
+            type='primary'
+            theme='outline'
+            onClick={addKeyValue}
+          >
+            {t('添加复写规则')}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   // 渲染可视化编辑器
   const renderVisualEditor = () => {
     switch (editorType) {
+      case 'statusCode':
+        return renderStatusCodeEditor();
       case 'region':
         return renderRegionEditor();
       case 'object':
