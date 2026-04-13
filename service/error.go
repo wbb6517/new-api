@@ -128,6 +128,11 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	return
 }
 
+type statusCodeMappingRule struct {
+	StatusCode *int
+	Message    string
+}
+
 func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) {
 	if newApiErr == nil {
 		return
@@ -145,11 +150,49 @@ func ResetStatusCode(newApiErr *types.NewAPIError, statusCodeMappingStr string) 
 	}
 	codeStr := strconv.Itoa(newApiErr.StatusCode)
 	if value, ok := statusCodeMapping[codeStr]; ok {
-		intCode, ok := parseStatusCodeMappingValue(value)
+		rule, ok := parseStatusCodeMappingRule(value)
 		if !ok {
 			return
 		}
-		newApiErr.StatusCode = intCode
+		if rule.StatusCode != nil {
+			newApiErr.StatusCode = *rule.StatusCode
+		}
+		if rule.Message != "" {
+			newApiErr.SetMessage(rule.Message)
+		}
+	}
+}
+
+func parseStatusCodeMappingRule(value any) (statusCodeMappingRule, bool) {
+	switch v := value.(type) {
+	case map[string]any:
+		var rule statusCodeMappingRule
+		if statusCodeRaw, exists := v["status_code"]; exists {
+			statusCode, ok := parseStatusCodeMappingValue(statusCodeRaw)
+			if !ok {
+				return statusCodeMappingRule{}, false
+			}
+			rule.StatusCode = &statusCode
+		} else if statusRaw, exists := v["status"]; exists {
+			statusCode, ok := parseStatusCodeMappingValue(statusRaw)
+			if !ok {
+				return statusCodeMappingRule{}, false
+			}
+			rule.StatusCode = &statusCode
+		}
+		if message, ok := v["message"].(string); ok {
+			rule.Message = strings.TrimSpace(message)
+		}
+		if rule.StatusCode == nil && rule.Message == "" {
+			return statusCodeMappingRule{}, false
+		}
+		return rule, true
+	default:
+		statusCode, ok := parseStatusCodeMappingValue(value)
+		if !ok {
+			return statusCodeMappingRule{}, false
+		}
+		return statusCodeMappingRule{StatusCode: &statusCode}, true
 	}
 }
 
