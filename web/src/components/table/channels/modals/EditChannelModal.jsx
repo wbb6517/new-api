@@ -93,7 +93,11 @@ const MODEL_MAPPING_EXAMPLE = {
 };
 
 const STATUS_CODE_MAPPING_EXAMPLE = {
-  400: '500',
+  400: 500,
+  429: {
+    status_code: 503,
+    message: '当前模型暂时不可用，请稍后重试',
+  },
 };
 
 const REGION_EXAMPLE = {
@@ -2400,7 +2404,7 @@ const EditChannelModal = (props) => {
                     field='status_code_mapping'
                     label={t('状态码复写')}
                     placeholder={
-                      t('此项可选，用于复写返回的状态码，仅影响本地判断，不修改返回到上游的状态码，比如将claude渠道的400错误复写为500（用于重试），请勿滥用该功能，例如：') +
+                      t('此项可选，用于复写返回状态码或错误消息，仅影响本地返回结果，不会修改上游真实响应。值可以是状态码，也可以是包含 status_code 和 message 的对象，例如：') +
                       '\n' +
                       JSON.stringify(STATUS_CODE_MAPPING_EXAMPLE, null, 2)
                     }
@@ -2412,7 +2416,7 @@ const EditChannelModal = (props) => {
                     templateLabel={t('填入模板')}
                     editorType='keyValue'
                     formApi={formApiRef.current}
-                    extraText={t('键为原状态码，值为要复写的状态码，仅影响本地判断')}
+                    extraText={t('键为原状态码；值可以是目标状态码，或 `{ status_code, message }` 对象。若仅设置 message，则只改写返回消息。')}
                   />
                 </div>
 

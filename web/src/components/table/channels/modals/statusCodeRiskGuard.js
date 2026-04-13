@@ -44,6 +44,58 @@ function parseStatusCodeMappingTarget(rawValue) {
   return null;
 }
 
+function parseStatusCodeMappingValue(rawValue) {
+  if (
+    rawValue &&
+    typeof rawValue === 'object' &&
+    !Array.isArray(rawValue)
+  ) {
+    let hasConfig = false;
+    let targetCode = null;
+
+    if (Object.prototype.hasOwnProperty.call(rawValue, 'status_code')) {
+      hasConfig = true;
+      targetCode = parseStatusCodeMappingTarget(rawValue.status_code);
+      if (targetCode === null) {
+        return { valid: false, targetCode: null };
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(rawValue, 'message')) {
+      hasConfig = true;
+      if (
+        typeof rawValue.message !== 'string' ||
+        rawValue.message.trim() === ''
+      ) {
+        return { valid: false, targetCode: null };
+      }
+    }
+
+    if (!hasConfig) {
+      return { valid: false, targetCode: null };
+    }
+
+    return { valid: true, targetCode };
+  }
+
+  const targetCode = parseStatusCodeMappingTarget(rawValue);
+  return {
+    valid: targetCode !== null,
+    targetCode,
+  };
+}
+
+function stringifyStatusCodeMappingValue(rawValue) {
+  if (typeof rawValue === 'object' && rawValue !== null) {
+    try {
+      return JSON.stringify(rawValue);
+    } catch {
+      return String(rawValue);
+    }
+  }
+  return String(rawValue);
+}
+
 export function collectInvalidStatusCodeEntries(statusCodeMappingStr) {
   if (
     typeof statusCodeMappingStr !== 'string' ||
@@ -66,9 +118,9 @@ export function collectInvalidStatusCodeEntries(statusCodeMappingStr) {
   const invalid = [];
   for (const [rawKey, rawValue] of Object.entries(parsed)) {
     const fromCode = parseStatusCodeKey(rawKey);
-    const toCode = parseStatusCodeMappingTarget(rawValue);
-    if (fromCode === null || toCode === null) {
-      invalid.push(`${rawKey} → ${rawValue}`);
+    const { valid } = parseStatusCodeMappingValue(rawValue);
+    if (fromCode === null || !valid) {
+      invalid.push(`${rawKey} → ${stringifyStatusCodeMappingValue(rawValue)}`);
     }
   }
 
@@ -97,10 +149,11 @@ export function collectDisallowedStatusCodeRedirects(statusCodeMappingStr) {
   const riskyMappings = [];
   Object.entries(parsed).forEach(([rawFrom, rawTo]) => {
     const fromCode = parseStatusCodeKey(rawFrom);
-    const toCode = parseStatusCodeMappingTarget(rawTo);
-    if (fromCode === null || toCode === null) {
+    const { valid, targetCode } = parseStatusCodeMappingValue(rawTo);
+    if (fromCode === null || !valid || targetCode === null) {
       return;
     }
+    const toCode = targetCode;
     if (!NON_REDIRECTABLE_STATUS_CODES.has(fromCode)) {
       return;
     }
