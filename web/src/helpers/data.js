@@ -29,10 +29,22 @@ export function setStatusData(data) {
   localStorage.setItem('enable_drawing', data.enable_drawing);
   localStorage.setItem('enable_task', data.enable_task);
   localStorage.setItem('enable_data_export', data.enable_data_export);
+  localStorage.setItem(
+    'data_export_quick_range_enabled',
+    data.data_export_quick_range_enabled,
+  );
   localStorage.setItem('chats', JSON.stringify(data.chats));
   localStorage.setItem(
     'data_export_default_time',
     data.data_export_default_time,
+  );
+  localStorage.setItem(
+    'data_export_default_quick_range',
+    data.data_export_default_quick_range || '7d',
+  );
+  localStorage.setItem(
+    'data_export_quick_range_options',
+    data.data_export_quick_range_options || '',
   );
   localStorage.setItem(
     'default_collapse_sidebar',

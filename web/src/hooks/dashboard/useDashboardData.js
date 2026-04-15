@@ -21,8 +21,17 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { API, isAdmin, showError, timestamp2string } from '../../helpers';
-import { getDefaultTime, getInitialTimestamp } from '../../helpers/dashboard';
-import { TIME_OPTIONS } from '../../constants/dashboard.constants';
+import {
+  getDefaultTime,
+  getInitialTimestamp,
+  getDashboardQuickRangeState,
+  getEnabledDashboardQuickRangeOptions,
+  getDashboardQuickRangeEnabled,
+  getDefaultQuickRange,
+} from '../../helpers/dashboard';
+import {
+  TIME_OPTIONS,
+} from '../../constants/dashboard.constants';
 import { useIsMobile } from '../common/useIsMobile';
 import { useMinimumLoadingTime } from '../common/useMinimumLoadingTime';
 
@@ -31,6 +40,13 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const initialized = useRef(false);
+  const statusQuickRangeEnabled = statusState?.status?.data_export_quick_range_enabled;
+  const statusDefaultQuickRange = statusState?.status?.data_export_default_quick_range;
+  const statusQuickRangeOptions = statusState?.status?.data_export_quick_range_options;
+
+  // 初始值设为兜底值
+  const initialQuickRange = getDefaultQuickRange();
+  const initialQuickRangeState = getDashboardQuickRangeState(initialQuickRange);
 
   // ========== 基础状态 ==========
   const [loading, setLoading] = useState(false);
@@ -43,14 +59,19 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     username: '',
     token_name: '',
     model_name: '',
-    start_timestamp: getInitialTimestamp(),
-    end_timestamp: timestamp2string(new Date().getTime() / 1000 + 3600),
+    start_timestamp: initialQuickRangeState.start_timestamp,
+    end_timestamp: initialQuickRangeState.end_timestamp,
     channel: '',
-    data_export_default_time: '',
+    data_export_default_time: initialQuickRangeState.data_export_default_time,
   });
 
-  const [dataExportDefaultTime, setDataExportDefaultTime] =
-    useState(getDefaultTime());
+  const [dataExportDefaultTime, setDataExportDefaultTime] = useState(
+    initialQuickRangeState.data_export_default_time,
+  );
+  const [activeQuickRange, setActiveQuickRange] = useState(initialQuickRange);
+  const [quickRangeEnabled, setQuickRangeEnabled] = useState(
+    getDashboardQuickRangeEnabled(),
+  );
 
   // ========== 数据状态 ==========
   const [quotaData, setQuotaData] = useState([]);
@@ -105,6 +126,18 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     [t],
   );
 
+  const quickRangeOptions = useMemo(
+    () =>
+      getEnabledDashboardQuickRangeOptions(
+        statusQuickRangeEnabled,
+        statusQuickRangeOptions,
+      ).map((option) => ({
+        ...option,
+        label: t(option.label),
+      })),
+    [t, statusQuickRangeOptions, statusQuickRangeEnabled],
+  );
+
   const performanceMetrics = useMemo(() => {
     const { start_timestamp, end_timestamp } = inputs;
     const timeDiff =
@@ -144,6 +177,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
       localStorage.setItem('data_export_default_time', value);
       return;
     }
+    if (name === 'start_timestamp' || name === 'end_timestamp') {
+      setActiveQuickRange('custom');
+    }
     setInputs((inputs) => ({ ...inputs, [name]: value }));
   }, []);
 
@@ -151,23 +187,22 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     setSearchModalVisible(true);
   }, []);
 
-  const handleCloseModal = useCallback(() => {
-    setSearchModalVisible(false);
-  }, []);
-
-  // ========== API 调用函数 ==========
-  const loadQuotaData = useCallback(async () => {
+  const loadQuotaData = useCallback(async (override = {}) => {
     setLoading(true);
     try {
       let url = '';
-      const { start_timestamp, end_timestamp, username } = inputs;
-      let localStartTimestamp = Date.parse(start_timestamp) / 1000;
-      let localEndTimestamp = Date.parse(end_timestamp) / 1000;
+      const startTimestamp = override.start_timestamp ?? inputs.start_timestamp;
+      const endTimestamp = override.end_timestamp ?? inputs.end_timestamp;
+      const username = override.username ?? inputs.username;
+      const defaultTime =
+        override.data_export_default_time ?? dataExportDefaultTime;
+      let localStartTimestamp = Date.parse(startTimestamp) / 1000;
+      let localEndTimestamp = Date.parse(endTimestamp) / 1000;
 
       if (isAdminUser) {
-        url = `/api/data/?username=${username}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&default_time=${dataExportDefaultTime}`;
+        url = `/api/data/?username=${username}&start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&default_time=${defaultTime}`;
       } else {
-        url = `/api/data/self/?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&default_time=${dataExportDefaultTime}`;
+        url = `/api/data/self/?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}&default_time=${defaultTime}`;
       }
 
       const res = await API.get(url);
@@ -191,7 +226,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     } finally {
       setLoading(false);
     }
-  }, [inputs, dataExportDefaultTime, isAdminUser, now]);
+  }, [inputs.start_timestamp, inputs.end_timestamp, inputs.username, dataExportDefaultTime, isAdminUser, now.getTime()]);
 
   const loadUptimeData = useCallback(async () => {
     setUptimeLoading(true);
@@ -213,12 +248,13 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [activeUptimeTab]);
 
-  const loadUserQuotaData = useCallback(async () => {
+  const loadUserQuotaData = useCallback(async (override = {}) => {
     if (!isAdminUser) return [];
     try {
-      const { start_timestamp, end_timestamp } = inputs;
-      const localStartTimestamp = Date.parse(start_timestamp) / 1000;
-      const localEndTimestamp = Date.parse(end_timestamp) / 1000;
+      const startTimestamp = override.start_timestamp ?? inputs.start_timestamp;
+      const endTimestamp = override.end_timestamp ?? inputs.end_timestamp;
+      const localStartTimestamp = Date.parse(startTimestamp) / 1000;
+      const localEndTimestamp = Date.parse(endTimestamp) / 1000;
       const url = `/api/data/users?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}`;
       const res = await API.get(url);
       const { success, message, data } = res.data;
@@ -232,7 +268,32 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
       console.error(err);
       return [];
     }
-  }, [inputs, isAdminUser]);
+  }, [inputs.start_timestamp, inputs.end_timestamp, isAdminUser]);
+
+  const applyQuickRange = useCallback(async (range) => {
+    const nextState = getDashboardQuickRangeState(range);
+    setInputs((prev) => ({
+      ...prev,
+      start_timestamp: nextState.start_timestamp,
+      end_timestamp: nextState.end_timestamp,
+    }));
+    setDataExportDefaultTime(nextState.data_export_default_time);
+    localStorage.setItem(
+      'data_export_default_time',
+      nextState.data_export_default_time,
+    );
+    setActiveQuickRange(range);
+
+    const quotaData = await loadQuotaData(nextState);
+    const userQuotaData = await loadUserQuotaData(nextState);
+    await loadUptimeData();
+
+    return { quotaData, userQuotaData, nextState };
+  }, [loadQuotaData, loadUserQuotaData, loadUptimeData]);
+
+  const handleCloseModal = useCallback(() => {
+    setSearchModalVisible(false);
+  }, []);
 
   const getUserData = useCallback(async () => {
     let res = await API.get(`/api/user/self`);
@@ -268,6 +329,61 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }, 100);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (statusDefaultQuickRange !== undefined && statusDefaultQuickRange !== null) {
+      const nextDefaultQuickRange = getDefaultQuickRange(statusDefaultQuickRange);
+      const nextState = getDashboardQuickRangeState(nextDefaultQuickRange);
+      setActiveQuickRange(nextDefaultQuickRange);
+      setInputs((prev) => ({
+        ...prev,
+        start_timestamp: nextState.start_timestamp,
+        end_timestamp: nextState.end_timestamp,
+        data_export_default_time: nextState.data_export_default_time,
+      }));
+      setDataExportDefaultTime(nextState.data_export_default_time);
+    }
+  }, [statusDefaultQuickRange]);
+
+  useEffect(() => {
+    if (quickRangeOptions.length === 0) {
+      return;
+    }
+
+    const matchedQuickRange = quickRangeOptions.find(
+      (option) => option.value === activeQuickRange,
+    );
+
+    if (!matchedQuickRange) {
+      const fallbackRange = getDefaultQuickRange(statusDefaultQuickRange);
+      const availableFallbackRange =
+        quickRangeOptions.find((option) => option.value === fallbackRange)?.value ||
+        quickRangeOptions[0].value;
+      const fallbackState = getDashboardQuickRangeState(availableFallbackRange);
+      setActiveQuickRange(availableFallbackRange);
+      setInputs((prev) => ({
+        ...prev,
+        start_timestamp: fallbackState.start_timestamp,
+        end_timestamp: fallbackState.end_timestamp,
+        data_export_default_time: fallbackState.data_export_default_time,
+      }));
+      setDataExportDefaultTime(fallbackState.data_export_default_time);
+      localStorage.setItem(
+        'data_export_default_time',
+        fallbackState.data_export_default_time,
+      );
+      return;
+    }
+
+    const nextState = getDashboardQuickRangeState(activeQuickRange);
+    setInputs((prev) => ({
+      ...prev,
+      start_timestamp: nextState.start_timestamp,
+      end_timestamp: nextState.end_timestamp,
+      data_export_default_time: nextState.data_export_default_time,
+    }));
+    setDataExportDefaultTime(nextState.data_export_default_time);
+  }, [quickRangeOptions, activeQuickRange, statusDefaultQuickRange]);
 
   useEffect(() => {
     if (!initialized.current) {
@@ -317,6 +433,9 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
     // 计算值
     timeOptions,
+    quickRangeOptions,
+    activeQuickRange,
+    quickRangeEnabled,
     performanceMetrics,
     getGreeting,
     isAdminUser,
@@ -329,6 +448,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
     // 函数
     handleInputChange,
+    applyQuickRange,
     showSearchModal,
     handleCloseModal,
     loadQuotaData,

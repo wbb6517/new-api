@@ -35,11 +35,106 @@ import {
   DEFAULT_TIME_INTERVALS,
   DEFAULTS,
   ILLUSTRATION_SIZE,
+  DEFAULT_DASHBOARD_QUICK_RANGE_OPTIONS,
 } from '../constants/dashboard.constants';
 
-// ========== 时间相关工具函数 ==========
+const normalizeDashboardQuickRangeOption = (option, index) => {
+  if (!option || typeof option !== 'object') {
+    return null;
+  }
+
+  const value = String(option.value || '').trim();
+  const label = String(option.label || '').trim();
+
+  if (!value || !label) {
+    return null;
+  }
+
+  return {
+    value,
+    label,
+    rangeType: option.rangeType === 'today' ? 'today' : 'relative',
+    amount: Math.max(Number(option.amount) || 1, 1),
+    unit: ['hour', 'day', 'week'].includes(option.unit) ? option.unit : 'day',
+    granularity: ['hour', 'day', 'week'].includes(option.granularity)
+      ? option.granularity
+      : getDefaultTime(),
+    enabled: option.enabled !== false,
+    sort: Number(option.sort) || index,
+  };
+};
+
 export const getDefaultTime = () => {
   return localStorage.getItem(STORAGE_KEYS.DATA_EXPORT_DEFAULT_TIME) || 'hour';
+};
+
+export const getDashboardQuickRangeEnabled = (overrideValue) => {
+  if (overrideValue !== undefined && overrideValue !== null) {
+    return overrideValue === true || overrideValue === 'true';
+  }
+
+  const storedValue = localStorage.getItem(
+    STORAGE_KEYS.DATA_EXPORT_QUICK_RANGE_ENABLED,
+  );
+  return storedValue === null ? true : storedValue === 'true';
+};
+
+export const getDefaultQuickRange = (overrideValue) => {
+  if (overrideValue !== undefined && overrideValue !== null) {
+    const normalizedValue = String(overrideValue).trim();
+    if (normalizedValue) {
+      return normalizedValue;
+    }
+  }
+
+  return (
+    localStorage.getItem(STORAGE_KEYS.DATA_EXPORT_DEFAULT_QUICK_RANGE) || '7d'
+  );
+};
+
+export const getDashboardQuickRangeOptions = (overrideValue) => {
+  const rawValue =
+    overrideValue !== undefined && overrideValue !== null
+      ? overrideValue
+      : localStorage.getItem(STORAGE_KEYS.DATA_EXPORT_QUICK_RANGE_OPTIONS);
+
+  const fallbackOptions = DEFAULT_DASHBOARD_QUICK_RANGE_OPTIONS.map((option, index) => ({
+    ...option,
+    sort: index,
+  }));
+
+  if (!rawValue) {
+    return fallbackOptions;
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+    if (!Array.isArray(parsedValue)) {
+      return fallbackOptions;
+    }
+
+    const normalizedOptions = parsedValue
+      .map((option, index) => normalizeDashboardQuickRangeOption(option, index))
+      .filter(Boolean)
+      .sort((a, b) => a.sort - b.sort);
+
+    return normalizedOptions.length > 0 ? normalizedOptions : fallbackOptions;
+  } catch {
+    return fallbackOptions;
+  }
+};
+
+export const getEnabledDashboardQuickRangeOptions = (
+  enabledOverride,
+  optionsOverride,
+) => {
+  if (!getDashboardQuickRangeEnabled(enabledOverride)) {
+    return [];
+  }
+
+  return getDashboardQuickRangeOptions(optionsOverride).filter(
+    (option) => option.enabled,
+  );
 };
 
 export const getTimeInterval = (timeType, isSeconds = false) => {
@@ -60,6 +155,96 @@ export const getInitialTimestamp = () => {
     default:
       return timestamp2string(now - 86400 * 7);
   }
+};
+
+const getQuickRangeDurationInSeconds = (amount, unit) => {
+  switch (unit) {
+    case 'hour':
+      return amount * 3600;
+    case 'week':
+      return amount * 7 * 24 * 3600;
+    case 'day':
+    default:
+      return amount * 24 * 3600;
+  }
+};
+
+const parseDashboardTimestamp = (value) => {
+  if (!value) return null;
+  const parsedValue = Date.parse(String(value).replace(/-/g, '/'));
+  return Number.isNaN(parsedValue) ? null : Math.floor(parsedValue / 1000);
+};
+
+const getDayBucketStart = (timestamp) => {
+  const date = new Date(timestamp * 1000);
+  date.setHours(0, 0, 0, 0);
+  return Math.floor(date.getTime() / 1000);
+};
+
+const getHourBucketStart = (timestamp) => Math.floor(timestamp / 3600) * 3600;
+
+const normalizeRangeStartForGranularity = (rangeStartTimestamp, granularity) => {
+  if (!rangeStartTimestamp) return null;
+  if (granularity === 'hour') {
+    return getHourBucketStart(rangeStartTimestamp);
+  }
+  return getDayBucketStart(rangeStartTimestamp);
+};
+
+const getBucketStartTimestamp = (
+  timestamp,
+  granularity,
+  rangeStartTimestamp = null,
+) => {
+  switch (granularity) {
+    case 'hour':
+      return getHourBucketStart(timestamp);
+    case 'week': {
+      const anchorTimestamp =
+        normalizeRangeStartForGranularity(rangeStartTimestamp, granularity) ||
+        getDayBucketStart(timestamp);
+      const interval = DEFAULT_TIME_INTERVALS.week.seconds;
+      return (
+        anchorTimestamp +
+        Math.floor((timestamp - anchorTimestamp) / interval) * interval
+      );
+    }
+    case 'day':
+    default:
+      return getDayBucketStart(timestamp);
+  }
+};
+
+const formatBucketLabel = (bucketStartTimestamp, granularity, showYear = false) =>
+  timestamp2string1(bucketStartTimestamp, granularity, showYear);
+
+
+export const getDashboardQuickRangeState = (range) => {
+  const options = getDashboardQuickRangeOptions();
+  const matchedOption =
+    options.find((option) => option.value === range) ||
+    DEFAULT_DASHBOARD_QUICK_RANGE_OPTIONS.find((option) => option.value === range) ||
+    DEFAULT_DASHBOARD_QUICK_RANGE_OPTIONS[0];
+
+  const now = new Date();
+  const end = new Date(now.getTime());
+  let start = new Date(now);
+
+  if (matchedOption.rangeType === 'today') {
+    start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  } else {
+    const durationSeconds = getQuickRangeDurationInSeconds(
+      matchedOption.amount,
+      matchedOption.unit,
+    );
+    start = new Date(now.getTime() - durationSeconds * 1000);
+  }
+
+  return {
+    start_timestamp: timestamp2string(start.getTime() / 1000),
+    end_timestamp: timestamp2string(end.getTime() / 1000),
+    data_export_default_time: matchedOption.granularity || getDefaultTime(),
+  };
 };
 
 // ========== 数据处理工具函数 ==========
@@ -248,6 +433,7 @@ export const processRawData = (
   dataExportDefaultTime,
   initializeMaps,
   updateMapValue,
+  rangeStartTimestamp = null,
 ) => {
   const result = {
     totalQuota: 0,
@@ -269,8 +455,13 @@ export const processRawData = (
     result.totalQuota += item.quota;
     result.totalTimes += item.count;
 
-    const timeKey = timestamp2string1(
+    const bucketStartTimestamp = getBucketStartTimestamp(
       item.created_at,
+      dataExportDefaultTime,
+      rangeStartTimestamp,
+    );
+    const timeKey = formatBucketLabel(
+      bucketStartTimestamp,
       dataExportDefaultTime,
       showYear,
     );
@@ -328,15 +519,24 @@ export const calculateTrendData = (
   };
 };
 
-export const aggregateDataByTimeAndModel = (data, dataExportDefaultTime) => {
+export const aggregateDataByTimeAndModel = (
+  data,
+  dataExportDefaultTime,
+  rangeStartTimestamp = null,
+) => {
   const aggregatedData = new Map();
 
   // 检查数据是否跨年
   const showYear = isDataCrossYear(data.map((item) => item.created_at));
 
   data.forEach((item) => {
-    const timeKey = timestamp2string1(
+    const bucketStartTimestamp = getBucketStartTimestamp(
       item.created_at,
+      dataExportDefaultTime,
+      rangeStartTimestamp,
+    );
+    const timeKey = formatBucketLabel(
+      bucketStartTimestamp,
       dataExportDefaultTime,
       showYear,
     );
@@ -364,32 +564,82 @@ export const generateChartTimePoints = (
   aggregatedData,
   data,
   dataExportDefaultTime,
+  startTsStr = null,
+  endTsStr = null,
 ) => {
-  let chartTimePoints = Array.from(
-    new Set([...aggregatedData.values()].map((d) => d.time)),
+  const parsedStartTimestamp = parseDashboardTimestamp(startTsStr);
+  const parsedEndTimestamp = parseDashboardTimestamp(endTsStr);
+  const interval = getTimeInterval(dataExportDefaultTime, true);
+
+  let lastTime =
+    parsedEndTimestamp !== null
+      ? parsedEndTimestamp
+      : Math.max(
+          ...(data || []).map((item) => item.created_at),
+          Date.now() / 1000,
+        );
+  let firstTime =
+    parsedStartTimestamp !== null
+      ? parsedStartTimestamp
+      : Math.min(
+          ...(data || []).map((item) => item.created_at),
+          lastTime - 7 * interval,
+        );
+
+  const normalizedRangeStart = normalizeRangeStartForGranularity(
+    firstTime,
+    dataExportDefaultTime,
+  );
+  const normalizedRangeEnd = getBucketStartTimestamp(
+    lastTime,
+    dataExportDefaultTime,
+    normalizedRangeStart,
   );
 
-  if (chartTimePoints.length < DEFAULTS.MAX_TREND_POINTS) {
-    const lastTime = Math.max(...data.map((item) => item.created_at));
-    const interval = getTimeInterval(dataExportDefaultTime, true);
-
-    // 生成时间点数组，用于检查是否跨年
-    const generatedTimestamps = Array.from(
-      { length: DEFAULTS.MAX_TREND_POINTS },
-      (_, i) => lastTime - (6 - i) * interval,
-    );
-    const showYear = isDataCrossYear(generatedTimestamps);
-
-    chartTimePoints = generatedTimestamps.map((ts) =>
-      timestamp2string1(ts, dataExportDefaultTime, showYear),
-    );
+  let count = 1;
+  if (startTsStr && endTsStr) {
+    const rawSpan = Math.max(lastTime - firstTime, 0);
+    if (dataExportDefaultTime === 'week') {
+      count = Math.max(Math.ceil(rawSpan / interval), 1);
+    } else {
+      count = Math.max(Math.floor(rawSpan / interval), 1);
+    }
+  } else {
+    const diff = normalizedRangeEnd - normalizedRangeStart;
+    count = Math.max(Math.floor(diff / interval), 0) + 1;
   }
 
-  return chartTimePoints;
+  const alignedStart = normalizedRangeEnd - (count - 1) * interval;
+
+  const generatedTimestamps = [];
+  for (let i = 0; i < count; i++) {
+    generatedTimestamps.push(alignedStart + i * interval);
+  }
+
+  // 仅在非快捷范围且点太少时做美观补齐
+  if (
+    !(startTsStr && endTsStr) &&
+    generatedTimestamps.length < DEFAULTS.MAX_TREND_POINTS
+  ) {
+    const missingCount = DEFAULTS.MAX_TREND_POINTS - generatedTimestamps.length;
+    for (let i = 1; i <= missingCount; i++) {
+      generatedTimestamps.unshift(normalizedRangeStart - i * interval);
+    }
+  }
+
+  const showYear = isDataCrossYear(generatedTimestamps);
+  return generatedTimestamps.map((timestamp) =>
+    formatBucketLabel(timestamp, dataExportDefaultTime, showYear),
+  );
 };
 
 // ========== 用户维度数据处理 ==========
-export const processUserData = (data, dataExportDefaultTime, limit = 10) => {
+export const processUserData = (
+  data,
+  dataExportDefaultTime,
+  limit = 10,
+  rangeStartTimestamp = null,
+) => {
   const userQuotaTotal = new Map();
   data.forEach((item) => {
     const prev = userQuotaTotal.get(item.username) || 0;
@@ -413,8 +663,13 @@ export const processUserData = (data, dataExportDefaultTime, limit = 10) => {
   const allTimePoints = new Set();
 
   data.forEach((item) => {
-    const timeKey = timestamp2string1(
+    const bucketStartTimestamp = getBucketStartTimestamp(
       item.created_at,
+      dataExportDefaultTime,
+      rangeStartTimestamp,
+    );
+    const timeKey = formatBucketLabel(
+      bucketStartTimestamp,
       dataExportDefaultTime,
       showYear,
     );

@@ -352,12 +352,16 @@ export const useDashboardCharts = (
   }, []);
 
   const updateChartData = useCallback(
-    (data) => {
+    (data, granularity = dataExportDefaultTime, startTimestamp = null, endTimestamp = null) => {
+      const parsedRangeStartTimestamp = startTimestamp
+        ? Date.parse(String(startTimestamp).replace(/-/g, '/')) / 1000
+        : null;
       const processedData = processRawData(
         data,
-        dataExportDefaultTime,
+        granularity,
         initializeMaps,
         updateMapValue,
+        parsedRangeStartTimestamp,
       );
 
       const {
@@ -376,7 +380,7 @@ export const useDashboardCharts = (
         timeQuotaMap,
         timeTokensMap,
         timeCountMap,
-        dataExportDefaultTime,
+        granularity,
       );
       setTrendData(trendDataResult);
 
@@ -385,7 +389,8 @@ export const useDashboardCharts = (
 
       const aggregatedData = aggregateDataByTimeAndModel(
         data,
-        dataExportDefaultTime,
+        granularity,
+        parsedRangeStartTimestamp,
       );
 
       const modelTotals = new Map();
@@ -403,7 +408,9 @@ export const useDashboardCharts = (
       const chartTimePoints = generateChartTimePoints(
         aggregatedData,
         data,
-        dataExportDefaultTime,
+        granularity,
+        startTimestamp,
+        endTimestamp,
       );
 
       let newLineData = [];
@@ -508,11 +515,15 @@ export const useDashboardCharts = (
 
   // ========== 用户维度图表数据处理 ==========
   const updateUserChartData = useCallback(
-    (data) => {
+    (data, granularity = dataExportDefaultTime, startTimestamp = null) => {
+      const parsedRangeStartTimestamp = startTimestamp
+        ? Date.parse(String(startTimestamp).replace(/-/g, '/')) / 1000
+        : null;
       const { rankingData, trendData: userTrend } = processUserData(
         data,
-        dataExportDefaultTime,
+        granularity,
         10,
+        parsedRangeStartTimestamp,
       );
 
       const userRankValues = rankingData.map((item) => ({

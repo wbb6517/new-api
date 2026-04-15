@@ -26,8 +26,11 @@ var DisplayTokenStatEnabled = true
 var DrawingEnabled = true
 var TaskEnabled = true
 var DataExportEnabled = true
+var DataExportQuickRangeEnabled = true
 var DataExportInterval = 5         // unit: minute
 var DataExportDefaultTime = "hour" // unit: minute
+var DataExportDefaultQuickRange = "7d"
+var DataExportQuickRangeOptions = `[{"value":"24h","label":"24小时","rangeType":"relative","amount":24,"unit":"hour","granularity":"hour","enabled":true},{"value":"today","label":"当天","rangeType":"today","amount":1,"unit":"day","granularity":"hour","enabled":true},{"value":"7d","label":"7天","rangeType":"relative","amount":7,"unit":"day","granularity":"day","enabled":true},{"value":"14d","label":"14天","rangeType":"relative","amount":14,"unit":"day","granularity":"day","enabled":true},{"value":"30d","label":"30天","rangeType":"relative","amount":30,"unit":"day","granularity":"week","enabled":true}]`
 var DefaultCollapseSidebar = false // default value of collapse sidebar
 
 // Any options with "Secret", "Token" in its key won't be return by GetOptions

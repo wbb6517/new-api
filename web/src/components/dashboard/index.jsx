@@ -21,6 +21,7 @@ import React, { useContext, useEffect } from 'react';
 import { getRelativeTime } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
+import Loading from '../common/ui/Loading';
 
 import DashboardHeader from './DashboardHeader';
 import StatsCards from './StatsCards';
@@ -90,31 +91,65 @@ const Dashboard = () => {
     if (dashboardData.isAdminUser) {
       const userData = await dashboardData.loadUserQuotaData();
       if (userData && userData.length > 0) {
-        dashboardCharts.updateUserChartData(userData);
+        dashboardCharts.updateUserChartData(
+          userData,
+          dashboardData.dataExportDefaultTime,
+          dashboardData.inputs.start_timestamp,
+        );
       }
     }
   };
 
   const initChart = async () => {
-    await dashboardData.loadQuotaData().then((data) => {
-      if (data && data.length > 0) {
-        dashboardCharts.updateChartData(data);
-      }
-    });
+    const data = await dashboardData.loadQuotaData();
+    dashboardCharts.updateChartData(
+      data || [],
+      dashboardData.dataExportDefaultTime,
+      dashboardData.inputs.start_timestamp,
+      dashboardData.inputs.end_timestamp,
+    );
     await loadUserData();
     await dashboardData.loadUptimeData();
   };
 
   const handleRefresh = async () => {
     const data = await dashboardData.refresh();
-    if (data && data.length > 0) {
-      dashboardCharts.updateChartData(data);
-    }
+    dashboardCharts.updateChartData(
+      data || [],
+      dashboardData.dataExportDefaultTime,
+      dashboardData.inputs.start_timestamp,
+      dashboardData.inputs.end_timestamp,
+    );
     await loadUserData();
   };
 
+  const handleQuickRangeChange = async (range) => {
+    const { quotaData, userQuotaData, nextState } =
+      await dashboardData.applyQuickRange(range);
+    dashboardCharts.updateChartData(
+      quotaData || [],
+      nextState.data_export_default_time,
+      nextState.start_timestamp,
+      nextState.end_timestamp,
+    );
+    if (dashboardData.isAdminUser) {
+      dashboardCharts.updateUserChartData(
+        userQuotaData || [],
+        nextState.data_export_default_time,
+        nextState.start_timestamp,
+      );
+    }
+  };
+
   const handleSearchConfirm = async () => {
-    await dashboardData.handleSearchConfirm(dashboardCharts.updateChartData);
+    await dashboardData.handleSearchConfirm((data) =>
+      dashboardCharts.updateChartData(
+        data,
+        dashboardData.dataExportDefaultTime,
+        dashboardData.inputs.start_timestamp,
+        dashboardData.inputs.end_timestamp,
+      ),
+    );
     await loadUserData();
   };
 
@@ -155,6 +190,9 @@ const Dashboard = () => {
       <DashboardHeader
         getGreeting={dashboardData.getGreeting}
         greetingVisible={dashboardData.greetingVisible}
+        quickRangeOptions={dashboardData.quickRangeOptions}
+        activeQuickRange={dashboardData.activeQuickRange}
+        onQuickRangeChange={handleQuickRangeChange}
         showSearchModal={dashboardData.showSearchModal}
         refresh={handleRefresh}
         loading={dashboardData.loading}
