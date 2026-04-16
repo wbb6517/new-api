@@ -78,6 +78,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
   const [consumeQuota, setConsumeQuota] = useState(0);
   const [consumeTokens, setConsumeTokens] = useState(0);
   const [times, setTimes] = useState(0);
+  const [requestCount, setRequestCount] = useState(0);
   const [pieData, setPieData] = useState([{ type: 'null', value: '0' }]);
   const [lineData, setLineData] = useState([]);
   const [modelColors, setModelColors] = useState({});
@@ -228,6 +229,29 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     }
   }, [inputs.start_timestamp, inputs.end_timestamp, inputs.username, dataExportDefaultTime, isAdminUser, now.getTime()]);
 
+  const loadRequestCount = useCallback(async (override = {}) => {
+    try {
+      const startTimestamp = override.start_timestamp ?? inputs.start_timestamp;
+      const endTimestamp = override.end_timestamp ?? inputs.end_timestamp;
+      const localStartTimestamp = Date.parse(startTimestamp) / 1000;
+      const localEndTimestamp = Date.parse(endTimestamp) / 1000;
+
+      const url = isAdminUser
+        ? `/api/data/request-count?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}`
+        : `/api/data/self/request-count?start_timestamp=${localStartTimestamp}&end_timestamp=${localEndTimestamp}`;
+
+      const res = await API.get(url);
+      const { success, data } = res.data;
+      if (success) {
+        setRequestCount(data || 0);
+        return data || 0;
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
+  }, [inputs.start_timestamp, inputs.end_timestamp, isAdminUser]);
+
   const loadUptimeData = useCallback(async () => {
     setUptimeLoading(true);
     try {
@@ -286,10 +310,11 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
     const quotaData = await loadQuotaData(nextState);
     const userQuotaData = await loadUserQuotaData(nextState);
+    await loadRequestCount(nextState);
     await loadUptimeData();
 
     return { quotaData, userQuotaData, nextState };
-  }, [loadQuotaData, loadUserQuotaData, loadUptimeData]);
+  }, [loadQuotaData, loadUserQuotaData, loadRequestCount, loadUptimeData]);
 
   const handleCloseModal = useCallback(() => {
     setSearchModalVisible(false);
@@ -307,9 +332,10 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
 
   const refresh = useCallback(async () => {
     const data = await loadQuotaData();
+    await loadRequestCount();
     await loadUptimeData();
     return data;
-  }, [loadQuotaData, loadUptimeData]);
+  }, [loadQuotaData, loadRequestCount, loadUptimeData]);
 
   const handleSearchConfirm = useCallback(
     async (updateChartDataCallback) => {
@@ -410,6 +436,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     setConsumeTokens,
     times,
     setTimes,
+    requestCount,
     pieData,
     setPieData,
     lineData,
@@ -452,6 +479,7 @@ export const useDashboardData = (userState, userDispatch, statusState) => {
     showSearchModal,
     handleCloseModal,
     loadQuotaData,
+    loadRequestCount,
     loadUserQuotaData,
     loadUptimeData,
     getUserData,

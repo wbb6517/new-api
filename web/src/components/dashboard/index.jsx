@@ -99,6 +99,7 @@ const Dashboard = () => {
     dashboardData.consumeQuota,
     dashboardData.consumeTokens,
     dashboardData.times,
+    dashboardData.requestCount,
     dashboardData.trendData,
     dashboardData.performanceMetrics,
     dashboardData.navigate,
@@ -128,6 +129,7 @@ const Dashboard = () => {
       dashboardData.inputs.start_timestamp,
       dashboardData.inputs.end_timestamp,
     );
+    await dashboardData.loadRequestCount();
     await loadUserData();
     await dashboardData.loadUptimeData();
   };

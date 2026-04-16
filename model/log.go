@@ -480,3 +480,14 @@ func DeleteOldLog(ctx context.Context, targetTimestamp int64, limit int) (int64,
 
 	return total, nil
 }
+
+func GetLogRequestCount(userId int, startTimestamp int64, endTimestamp int64) (count int64, err error) {
+	tx := LOG_DB.Model(&Log{}).Where("created_at >= ? AND created_at <= ?", startTimestamp, endTimestamp)
+	if userId > 0 {
+		tx = tx.Where("user_id = ?", userId)
+	}
+	// 只统计消费和错误类型，因为这才是真正的"请求"
+	tx = tx.Where("type IN (?)", []int{LogTypeConsume, LogTypeError})
+	err = tx.Count(&count).Error
+	return count, err
+}

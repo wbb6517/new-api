@@ -294,7 +294,9 @@ func SetApiRouter(router *gin.Engine) {
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)
+		dataRoute.GET("/request-count", middleware.AdminAuth(), controller.GetAllRequestCount)
 		dataRoute.GET("/self", middleware.UserAuth(), controller.GetUserQuotaDates)
+		dataRoute.GET("/self/request-count", middleware.UserAuth(), controller.GetUserRequestCount)
 
 		logRoute.Use(middleware.CORS(), middleware.CriticalRateLimit())
 		{

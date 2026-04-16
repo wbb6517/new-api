@@ -57,7 +57,8 @@ const HeaderLogo = ({
           >
             <Typography.Title
               heading={4}
-              className='!text-lg !font-semibold !mb-0'
+              className='!text-xl !font-normal !mb-0'
+              style={{ fontFamily: "'Audiowide', sans-serif", letterSpacing: '0.04em' }}
             >
               {systemName}
             </Typography.Title>

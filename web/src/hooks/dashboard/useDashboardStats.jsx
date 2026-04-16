@@ -37,6 +37,7 @@ export const useDashboardStats = (
   consumeQuota,
   consumeTokens,
   times,
+  requestCount,
   trendData,
   performanceMetrics,
   navigate,
@@ -72,7 +73,7 @@ export const useDashboardStats = (
         items: [
           {
             title: t('请求次数'),
-            value: userState.user?.request_count,
+            value: requestCount,
             icon: <IconSend />,
             avatarColor: 'green',
             trendData: [],
@@ -136,7 +137,7 @@ export const useDashboardStats = (
     [
       userState?.user?.quota,
       userState?.user?.used_quota,
-      userState?.user?.request_count,
+      requestCount,
       times,
       consumeQuota,
       consumeTokens,
