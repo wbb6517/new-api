@@ -36,7 +36,7 @@ import {
   IllustrationNoResult,
   IllustrationNoResultDark,
 } from '@douyinfe/semi-illustrations';
-import { Plus, Edit, Trash2, Save, CalendarRange } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, CalendarRange, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   API,
   compareObjects,
@@ -233,9 +233,25 @@ export default function DataDashboard(props) {
       {
         title: t('操作'),
         key: 'action',
-        width: 160,
-        render: (_, record) => (
+        width: 220,
+        render: (_, record, index) => (
           <Space>
+            <Button
+              icon={<ArrowUp size={14} />}
+              theme='light'
+              type='tertiary'
+              size='small'
+              disabled={index === 0}
+              onClick={() => handleMoveUp(index)}
+            />
+            <Button
+              icon={<ArrowDown size={14} />}
+              theme='light'
+              type='tertiary'
+              size='small'
+              disabled={index === quickRangeOptions.length - 1}
+              onClick={() => handleMoveDown(index)}
+            />
             <Button
               icon={<Edit size={14} />}
               theme='light'
@@ -260,6 +276,20 @@ export default function DataDashboard(props) {
     ],
     [quickRangeOptions, t],
   );
+
+  const handleMoveUp = (index) => {
+    if (index <= 0) return;
+    const newOptions = [...quickRangeOptions];
+    [newOptions[index - 1], newOptions[index]] = [newOptions[index], newOptions[index - 1]];
+    updateQuickRangeOptionValue(newOptions);
+  };
+
+  const handleMoveDown = (index) => {
+    if (index >= quickRangeOptions.length - 1) return;
+    const newOptions = [...quickRangeOptions];
+    [newOptions[index], newOptions[index + 1]] = [newOptions[index + 1], newOptions[index]];
+    updateQuickRangeOptionValue(newOptions);
+  };
 
   const handleAddOption = () => {
     setEditingOption(null);

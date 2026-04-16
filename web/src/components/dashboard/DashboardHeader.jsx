@@ -25,7 +25,7 @@ const DashboardHeader = ({
           {getGreeting}
         </h2>
         {quickRangeOptions.length > 0 && (
-          <div className='inline-flex items-center gap-0.5 rounded-full bg-[#f4f4f5] p-[2px] border border-[#e4e4e7]'>
+          <div className='inline-flex h-8 items-center rounded-full bg-semi-color-fill-0 p-0.5'>
             {quickRangeOptions.map((option) => {
               const active = activeQuickRange === option.value;
               return (
@@ -33,15 +33,14 @@ const DashboardHeader = ({
                   key={option.value}
                   onClick={() => onQuickRangeChange(option.value)}
                   className={`
-                    relative flex items-center justify-center rounded-full
-                    px-3 py-1 text-[12px] font-medium transition-all duration-200
+                    h-7 min-w-[56px] px-2 rounded-full whitespace-nowrap
+                    text-xs font-medium transition-colors duration-200
                     ${
                       active
-                        ? 'bg-white text-[#09090b] shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_-1px_rgba(0,0,0,0.1)]'
-                        : 'text-[#71717a] hover:text-[#18181b] hover:bg-[#e4e4e7]/50'
+                        ? 'bg-semi-color-fill-0 text-semi-color-text-0'
+                        : 'text-semi-color-text-1 hover:bg-semi-color-fill-0 hover:text-semi-color-text-0'
                     }
                   `}
-                  style={{ minHeight: '24px' }}
                 >
                   {option.label}
                 </button>

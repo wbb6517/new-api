@@ -17,8 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import React, { useContext, useEffect } from 'react';
-import { getRelativeTime } from '../../helpers';
+import React, { useContext, useEffect, useRef, useCallback } from 'react';
+import { getRelativeTime, showWarning } from '../../helpers';
 import { UserContext } from '../../context/User';
 import { StatusContext } from '../../context/Status';
 import Loading from '../common/ui/Loading';
@@ -61,6 +61,25 @@ const Dashboard = () => {
   // ========== 主要数据管理 ==========
   const dashboardData = useDashboardData(userState, userDispatch, statusState);
 
+  // ========== 查询频率限制（60秒冷却）==========
+  const QUERY_COOLDOWN_MS = 60 * 1000;
+  const lastQueryTimeRef = useRef(0);
+
+  const checkQueryCooldown = useCallback(() => {
+    if (dashboardData.isAdminUser) {
+      return true;
+    }
+    const now = Date.now();
+    const elapsed = now - lastQueryTimeRef.current;
+    if (lastQueryTimeRef.current > 0 && elapsed < QUERY_COOLDOWN_MS) {
+      const remaining = Math.ceil((QUERY_COOLDOWN_MS - elapsed) / 1000);
+      showWarning(dashboardData.t('查询过于频繁，请 {{seconds}} 秒后再试', { seconds: remaining }));
+      return false;
+    }
+    lastQueryTimeRef.current = now;
+    return true;
+  }, [dashboardData.isAdminUser, dashboardData.t]);
+
   // ========== 图表管理 ==========
   const dashboardCharts = useDashboardCharts(
     dashboardData.dataExportDefaultTime,
@@ -101,6 +120,7 @@ const Dashboard = () => {
   };
 
   const initChart = async () => {
+    lastQueryTimeRef.current = Date.now();
     const data = await dashboardData.loadQuotaData();
     dashboardCharts.updateChartData(
       data || [],
@@ -113,6 +133,7 @@ const Dashboard = () => {
   };
 
   const handleRefresh = async () => {
+    if (!checkQueryCooldown()) return;
     const data = await dashboardData.refresh();
     dashboardCharts.updateChartData(
       data || [],
@@ -124,6 +145,7 @@ const Dashboard = () => {
   };
 
   const handleQuickRangeChange = async (range) => {
+    if (!checkQueryCooldown()) return;
     const { quotaData, userQuotaData, nextState } =
       await dashboardData.applyQuickRange(range);
     dashboardCharts.updateChartData(
@@ -142,6 +164,7 @@ const Dashboard = () => {
   };
 
   const handleSearchConfirm = async () => {
+    if (!checkQueryCooldown()) return;
     await dashboardData.handleSearchConfirm((data) =>
       dashboardCharts.updateChartData(
         data,
