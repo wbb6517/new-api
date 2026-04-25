@@ -31,4 +31,4 @@ data/
 .gopath
 task_docs
 
-token_estimator_test.go
+token_estimator_test.go.worktrees/
