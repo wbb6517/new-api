@@ -1,0 +1,11 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Open O ring - black, enlarged -->
+  <circle cx="90" cy="90" r="58"
+          stroke="#1A1A1A" stroke-width="24" stroke-linecap="round"
+          stroke-dasharray="310 54"
+          transform="rotate(-35 90 90)"
+          fill="none"/>
+
+  <!-- Center dot - proportionally enlarged -->
+  <circle cx="90" cy="90" r="18" fill="#1A1A1A"/>
+</svg>
